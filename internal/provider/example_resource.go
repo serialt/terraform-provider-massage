@@ -5,15 +5,12 @@ package provider
 
 import (
 	"context"
-	"fmt"
-	"net/http"
+	"net/smtp"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -28,18 +25,24 @@ func NewExampleResource() resource.Resource {
 
 // ExampleResource defines the resource implementation.
 type ExampleResource struct {
-	client *http.Client
 }
 
 // ExampleResourceModel describes the resource data model.
 type ExampleResourceModel struct {
-	ConfigurableAttribute types.String `tfsdk:"configurable_attribute"`
-	Defaulted             types.String `tfsdk:"defaulted"`
-	Id                    types.String `tfsdk:"id"`
+	To           types.String `tfsdk:"to"`
+	From         types.String `tfsdk:"from"`
+	ReplyTo      types.String `tfsdk:"reply_to"`
+	Subject      types.String `tfsdk:"subject"`
+	Preamble     types.String `tfsdk:"proeable"`
+	Body         types.String `tfsdk:"body"`
+	SmtpServer   types.String `tfsdk:"smtp_server"`
+	SmtpPort     types.String `tfsdk:"smtp_port"`
+	SmtpUsername types.String `tfsdk:"smtp_username"`
+	SmtpPassword types.String `tfsdk:"smtp_password"`
 }
 
 func (r *ExampleResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_example"
+	resp.TypeName = req.ProviderTypeName + "_email"
 }
 
 func (r *ExampleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -48,22 +51,53 @@ func (r *ExampleResource) Schema(ctx context.Context, req resource.SchemaRequest
 		MarkdownDescription: "Example resource",
 
 		Attributes: map[string]schema.Attribute{
-			"configurable_attribute": schema.StringAttribute{
-				MarkdownDescription: "Example configurable attribute",
+			"to": schema.StringAttribute{
+				MarkdownDescription: "to user",
 				Optional:            true,
 			},
-			"defaulted": schema.StringAttribute{
-				MarkdownDescription: "Example configurable attribute with default value",
-				Optional:            true,
-				Computed:            true,
+			"from": schema.StringAttribute{
+				MarkdownDescription: "from ",
 				Default:             stringdefault.StaticString("example value when not configured"),
 			},
-			"id": schema.StringAttribute{
-				Computed:            true,
+			"reply_to": schema.StringAttribute{
+				Optional:            true,
 				MarkdownDescription: "Example identifier",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Default:             stringdefault.StaticString("user"),
+			},
+			"subject": schema.StringAttribute{
+
+				MarkdownDescription: "subject",
+				Default:             stringdefault.StaticString("user"),
+			},
+			"preamble": schema.StringAttribute{
+
+				MarkdownDescription: "Example identifier",
+				Default:             stringdefault.StaticString("user"),
+			},
+			"body": schema.StringAttribute{
+
+				MarkdownDescription: "Example identifier",
+				Default:             stringdefault.StaticString("user"),
+			},
+			"smtp_server": schema.StringAttribute{
+
+				MarkdownDescription: "Example identifier",
+				Default:             stringdefault.StaticString("user"),
+			},
+			"smtp_port": schema.StringAttribute{
+
+				MarkdownDescription: "Example identifier",
+				Default:             stringdefault.StaticString("user"),
+			},
+			"smtp_username": schema.StringAttribute{
+
+				MarkdownDescription: "Example identifier",
+				Default:             stringdefault.StaticString("user"),
+			},
+			"smtp_password": schema.StringAttribute{
+
+				MarkdownDescription: "Example identifier",
+				Default:             stringdefault.StaticString("password"),
 			},
 		},
 	}
@@ -75,18 +109,6 @@ func (r *ExampleResource) Configure(ctx context.Context, req resource.ConfigureR
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
-
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
-		return
-	}
-
-	r.client = client
 }
 
 func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -98,19 +120,32 @@ func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	data.To = types.StringValue("to")
+	data.From = types.StringValue("from")
+	data.ReplyTo = types.StringValue("reply_to")
+	data.Subject = types.StringValue("subject")
+	data.Preamble = types.StringValue("preamble")
+	data.Body = types.StringValue("body")
+	data.SmtpServer = types.StringValue("smtp_server")
+	data.SmtpPort = types.StringValue("smtp_port")
+	data.SmtpUsername = types.StringValue("smtp_username")
+	data.SmtpPassword = types.StringValue("smtp_password")
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create example, got error: %s", err))
-	//     return
-	// }
+	msg := "From: " + data.From.String() + "\n" +
+		"To: " + data.To.String() + "\n" +
+		"Reply-To: " + data.ReplyTo.String() + "\n" +
+		"Subject: " + data.Subject.String() + "\n" +
+		data.Preamble.String() + "\n\n" +
+		data.Body.String()
 
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Id = types.StringValue("example-id")
+	err := smtp.SendMail(data.SmtpServer.String()+":"+data.SmtpPort.String(),
+		smtp.PlainAuth("", data.SmtpUsername.String(), data.SmtpPassword.String(), data.SmtpServer.String()),
+		data.From.String(), []string{data.To.String()}, []byte(msg))
 
+	if err != nil {
+		tflog.Error(ctx, "sendmail failed")
+		return
+	}
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
 	tflog.Trace(ctx, "created a resource")
@@ -120,66 +155,12 @@ func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data ExampleResourceModel
-
-	// Read Terraform prior state data into the model
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read example, got error: %s", err))
-	//     return
-	// }
-
-	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ExampleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data ExampleResourceModel
-
-	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update example, got error: %s", err))
-	//     return
-	// }
-
-	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ExampleResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data ExampleResourceModel
-
-	// Read Terraform prior state data into the model
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete example, got error: %s", err))
-	//     return
-	// }
 }
 
 func (r *ExampleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
