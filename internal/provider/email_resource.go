@@ -51,32 +51,32 @@ func (r *emailResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 		Attributes: map[string]schema.Attribute{
 			"to": schema.StringAttribute{
 				MarkdownDescription: "to user",
-				Optional:            false,
+				Optional:            true,
 			},
 			"subject": schema.StringAttribute{
 
 				MarkdownDescription: "subject",
-				Optional:            false,
+				Optional:            true,
 			},
 			"body": schema.StringAttribute{
 				MarkdownDescription: "email body",
-				Optional:            false,
+				Optional:            true,
 			},
 			"smtp_server": schema.StringAttribute{
 				MarkdownDescription: "smtp server",
-				Optional:            false,
+				Optional:            true,
 			},
 			"smtp_port": schema.StringAttribute{
 				MarkdownDescription: "smtp server port",
-				Optional:            false,
+				Optional:            true,
 			},
 			"smtp_username": schema.StringAttribute{
 				MarkdownDescription: "email username",
-				Optional:            false,
+				Optional:            true,
 			},
 			"smtp_password": schema.StringAttribute{
 				MarkdownDescription: "email password",
-				Optional:            false,
+				Optional:            true,
 			},
 		},
 	}
